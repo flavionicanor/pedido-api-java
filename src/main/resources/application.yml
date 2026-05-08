@@ -1,0 +1,37 @@
+spring:
+  application:
+    name: pedidos-api
+
+  datasource:
+    url: jdbc:h2:mem:pedidosdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+security:
+  jwt:
+    secret: "3cTvk9LmNpQrWxYzAbCdEfGhIjKlMnOpQrStUvWxYzAbCdEfGhIjKlMnOpQrSt"
+    expiration: 86400000
+
+server:
+  port: 8081
+
+logging:
+  level:
+    com.seunome.pedidos: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.springframework.web: DEBUG      # ← adiciona
+    org.springframework.security: DEBUG # ← adiciona
