@@ -28,7 +28,7 @@ public class PedidoService {
     private final PedidoMapper mapper;
 
     @Transactional
-    public PedidoResponse criar(CriarPedidoRequest request){
+    public PedidoResponse criar(CriarPedidoRequest request) {
         log.info("Criando pedido para cliente: {}", request.clienteId());
 
         List<Item> itens = request.itens().stream()
@@ -38,8 +38,8 @@ public class PedidoService {
 
         Pedido pedido = new Pedido(request.clienteId(), itens);
 
-        // save() retorna a entidade com o ID gerado pelo @GeneratedValue
-        PedidoEntity salvo = repository.save(mapper.toEntity(pedido));
+        // toNewEntity — sem ID, banco gera via @GeneratedValue
+        PedidoEntity salvo = repository.save(mapper.toNewEntity(pedido));
 
         log.info("Pedido criado com ID: {}", salvo.getId());
         return PedidoResponse.from(mapper.toDomain(salvo));

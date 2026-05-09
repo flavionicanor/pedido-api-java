@@ -14,14 +14,16 @@ import java.util.List;
 @Component
 public class PedidoMapper {
 
-    // Domínio → Entidade (para salvar no banco)
-    public PedidoEntity toEntity(Pedido pedido) {
+    // CRIAÇÃO — sem ID, o @GeneratedValue do banco gera
+    public PedidoEntity toNewEntity(Pedido pedido) {
         PedidoEntity entity = new PedidoEntity();
+        // sem setId — banco gera via @GeneratedValue
         entity.setClienteId(pedido.getClienteId());
         entity.setStatus(toEnum(pedido.getStatus()));
         entity.setCriadoEm(pedido.getCriadoEm());
+        preencherCamposStatus(entity, pedido.getStatus());
 
-        pedido.getItens().forEach(item ->{
+        pedido.getItens().forEach(item -> {
             ItemEntity itemEntity = toItemEntity(item);
             entity.adicionarItem(itemEntity);
         });
@@ -29,7 +31,24 @@ public class PedidoMapper {
         return entity;
     }
 
-    // Entidade → Domínio (para usar na lógica de negócio)
+    // ATUALIZAÇÃO — com ID, o JPA sabe qual registro atualizar
+    public PedidoEntity toEntity(Pedido pedido) {
+        PedidoEntity entity = new PedidoEntity();
+        entity.setId(pedido.getId());           // ← seta o ID para o merge funcionar
+        entity.setClienteId(pedido.getClienteId());
+        entity.setStatus(toEnum(pedido.getStatus()));
+        entity.setCriadoEm(pedido.getCriadoEm());
+        preencherCamposStatus(entity, pedido.getStatus());
+
+        pedido.getItens().forEach(item -> {
+            ItemEntity itemEntity = toItemEntity(item);
+            entity.adicionarItem(itemEntity);
+        });
+
+        return entity;
+    }
+
+    // Entidade → Domínio
     public Pedido toDomain(PedidoEntity entity) {
         List<Item> itens = entity.getItens().stream()
                 .map(this::toItemDomain)
@@ -39,12 +58,35 @@ public class PedidoMapper {
                 entity.getId(),
                 entity.getClienteId(),
                 itens,
-                toStatusDomain(entity.getStatus(), entity),
+                toStatusDomain(entity),   // agora usa os campos reais do banco
                 entity.getCriadoEm()
         );
     }
 
-    private ItemEntity toItemEntity(Item item){
+    // preenche os campos extras de acordo com o status
+    private void preencherCamposStatus(PedidoEntity entity, StatusPedido status) {
+        switch (status) {
+            case StatusPedido.Processando p -> entity.setResponsavel(p.responsavel());
+            case StatusPedido.Concluido c   -> entity.setConcluidoEm(c.concluidoEm());
+            case StatusPedido.Cancelado c   -> entity.setMotivoCancelamento(c.motivo());
+            default -> {}
+        }
+    }
+
+    // reconstrói o status usando os campos reais salvos no banco
+    private StatusPedido toStatusDomain(PedidoEntity entity) {
+        return switch (entity.getStatus()) {
+            case AGUARDANDO  -> new StatusPedido.Aguardando();
+            case PROCESSANDO -> new StatusPedido.Processando(
+                    entity.getResponsavel() != null ? entity.getResponsavel() : "sistema");
+            case CONCLUIDO   -> new StatusPedido.Concluido(
+                    entity.getConcluidoEm() != null ? entity.getConcluidoEm() : entity.getCriadoEm());
+            case CANCELADO   -> new StatusPedido.Cancelado(
+                    entity.getMotivoCancelamento() != null ? entity.getMotivoCancelamento() : "");
+        };
+    }
+
+    private ItemEntity toItemEntity(Item item) {
         ItemEntity itemEntity = new ItemEntity();
         itemEntity.setProdutoId(item.produtoId());
         itemEntity.setNome(item.nome());
@@ -53,7 +95,7 @@ public class PedidoMapper {
         return itemEntity;
     }
 
-    private Item toItemDomain(ItemEntity entity){
+    private Item toItemDomain(ItemEntity entity) {
         return new Item(
                 entity.getProdutoId(),
                 entity.getNome(),
@@ -62,22 +104,12 @@ public class PedidoMapper {
         );
     }
 
-    private StatusPedidoEnum toEnum(StatusPedido status){
-        return switch (status){
-            case StatusPedido.Aguardando a -> StatusPedidoEnum.AGUARDANDO;
+    private StatusPedidoEnum toEnum(StatusPedido status) {
+        return switch (status) {
+            case StatusPedido.Aguardando a  -> StatusPedidoEnum.AGUARDANDO;
             case StatusPedido.Processando p -> StatusPedidoEnum.PROCESSANDO;
-            case StatusPedido.Concluido c -> StatusPedidoEnum.CONCLUIDO;
-            case StatusPedido.Cancelado c -> StatusPedidoEnum.CANCELADO;
+            case StatusPedido.Concluido c   -> StatusPedidoEnum.CONCLUIDO;
+            case StatusPedido.Cancelado c   -> StatusPedidoEnum.CANCELADO;
         };
     }
-
-    private StatusPedido toStatusDomain(StatusPedidoEnum status, PedidoEntity entity){
-        return switch (status){
-            case AGUARDANDO -> new StatusPedido.Aguardando();
-            case PROCESSANDO -> new StatusPedido.Processando("sistema");
-            case CONCLUIDO -> new StatusPedido.Concluido(LocalDateTime.now());
-            case CANCELADO -> new StatusPedido.Cancelado("restaurado do banco");
-        };
-    }
-
 }
